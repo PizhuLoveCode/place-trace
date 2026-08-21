@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>西湖经纬 · 家庭版</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="atmosphere" aria-hidden="true"></div>
+  <div class="map-banner hidden" id="mapBanner" role="status"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">湖</span>
+      <div>
+        <p class="brand-kicker" id="brandKicker">地方经纬 · Place Trace</p>
+        <h1 id="brandTitle">西湖经纬</h1>
+      </div>
+    </div>
+    <div class="top-actions">
+      <label class="pack-switch">
+        <span>景点</span>
+        <select id="packSelect" aria-label="切换景点内容包"></select>
+      </label>
+      <div class="top-stats" id="topStats"></div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="map-panel">
+      <div id="map" role="application" aria-label="西湖历史地图"></div>
+      <div class="map-controls">
+        <button type="button" class="btn primary" id="btnPlay">▶ 播放湖史</button>
+        <button type="button" class="btn" id="btnReset">↺ 重置</button>
+        <div class="speed" role="group" aria-label="播放速度">
+          <button type="button" class="chip" data-speed="0.7">0.7×</button>
+          <button type="button" class="chip active" data-speed="1">1×</button>
+          <button type="button" class="chip" data-speed="1.6">1.6×</button>
+        </div>
+      </div>
+      <div class="timeline" id="timeline" aria-label="时间轴"></div>
+    </section>
+
+    <aside class="story-panel">
+      <div class="mode-row">
+        <button type="button" class="mode active" data-mode="listen">一起听故事</button>
+        <button type="button" class="mode" data-mode="explore">一起探险</button>
+      </div>
+
+      <div class="progress-row">
+        <span id="progressText">1 / 12</span>
+        <div class="stamps" id="stamps" aria-label="足迹章"></div>
+      </div>
+
+      <article class="card" id="storyCard">
+        <div class="meta">
+          <span class="year" id="stopYear">—</span>
+          <span class="badge" id="stopConfidence">—</span>
+        </div>
+        <p class="place" id="stopPlace">—</p>
+        <h2 id="stopTitle">加载中…</h2>
+        <p class="person" id="stopPerson" hidden></p>
+        <p class="kid" id="stopKid"></p>
+        <details class="parent-note">
+          <summary>家长旁注</summary>
+          <p id="stopParent"></p>
+        </details>
+
+        <div class="quiz" id="quizBox">
+          <p class="quiz-q" id="quizQ"></p>
+          <div class="quiz-options" id="quizOptions"></div>
+          <p class="quiz-feedback" id="quizFeedback" hidden></p>
+        </div>
+
+        <p class="sources" id="stopSources"></p>
+        <a class="amap-link" id="amapLink" href="#" target="_blank" rel="noopener">在高德地图查看现代位置 ↗</a>
+
+        <section class="ask-box" aria-label="问一问">
+          <div class="ask-head">
+            <h3>问一问</h3>
+            <span class="ask-tag" id="askTag">AI · 本站资料</span>
+          </div>
+          <p class="ask-hint">基于这一站的故事提问，AI 不会乱编没写过的年份。</p>
+          <div class="ask-chips" id="askChips"></div>
+          <div class="ask-row">
+            <input id="askInput" type="text" maxlength="120" placeholder="例如：这一站为什么重要？" autocomplete="off" />
+            <button type="button" class="btn primary" id="btnAsk">问</button>
+          </div>
+          <div class="ask-answer hidden" id="askAnswer" role="status"></div>
+        </section>
+      </article>
+
+      <div class="nav-row">
+        <button type="button" class="btn" id="btnPrev">上一站</button>
+        <button type="button" class="btn primary" id="btnNext">下一站</button>
+      </div>
+    </aside>
+  </main>
+
+  <div class="overlay" id="startOverlay">
+    <div class="overlay-card">
+      <p class="eyebrow" id="overlayEyebrow">今晚我们当一回小小湖史官</p>
+      <h2 id="overlayTitle">西湖经纬</h2>
+      <p class="overlay-desc" id="overlayDesc">从湖的成形到世界遗产，用地图播放一座湖的故事。大约 20 分钟，适合家长和孩子一起。</p>
+      <button type="button" class="btn primary lg" id="btnStart">开始今晚的湖史</button>
+    </div>
+  </div>
+
+  <div class="overlay hidden" id="endOverlay">
+    <div class="overlay-card end-card" id="shareCard">
+      <p class="eyebrow">今晚我们走过的路</p>
+      <h2>西湖 · 家庭足迹</h2>
+      <ul id="endList"></ul>
+      <p class="end-note" id="endNote"></p>
+      <div class="nav-row">
+        <button type="button" class="btn primary" id="btnReplay">再走一遍</button>
+        <button type="button" class="btn" id="btnCloseEnd">回到地图</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./amap-config.js"></script>
+  <script src="./ai-config.js"></script>
+  <script src="./packs.js"></script>
+  <script src="./ai.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
