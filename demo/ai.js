@@ -112,5 +112,79 @@
     return { text: localAnswer(pack, stop, q), source: "local" };
   }
 
-  window.PlaceTraceAI = { askAboutStop, getConfig, buildContext };
+  const PACK_SYSTEM = `你是「地方经纬」内容包作者，为亲子（6–12 岁 + 家长）生成可播放的景点地史 JSON。
+只输出一个 JSON 对象，不要 Markdown，不要解释。
+
+字段要求：
+- 根：id(英文短横线或拼音)、title、subtitle、tagline、place、map:{center:[lat,lng],zoom}、modes、themes、stops
+- 每站：id、year、yearLabel、title、placeName、modernPlace、coords[lat,lng]、stage、stamp(2–3字)、person(可null)、confidence、confidenceNote、kid、parent、quiz{q,options[3],answer(0-2或null),hint}、sources[1-3条]
+- 8–10 站；主线清晰（参观顺序或地理环线，不要年代乱跳穿梭）
+- kid 约 80–120 字口语；parent 短旁注；传说与史实分开
+- coords 用现代可访点的大致坐标；不确定写 confidence「示意/推定」并在 confidenceNote 说明
+- 禁止编造精确到天的假史料；sources 写常见公开出处类型即可（地方志、景区说明、教材级常识）
+- map.center 取景区中心附近；zoom 通常 13–15`;
+
+  function extractJsonObject(text) {
+    const raw = String(text || "").trim();
+    const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    const body = fenced ? fenced[1].trim() : raw;
+    const start = body.indexOf("{");
+    const end = body.lastIndexOf("}");
+    if (start < 0 || end <= start) throw new Error("AI 未返回 JSON 对象");
+    return JSON.parse(body.slice(start, end + 1));
+  }
+
+  async function generatePack(placeName, options = {}) {
+    const place = String(placeName || "").trim();
+    if (!place) throw new Error("请填写景点名称");
+
+    const { baseUrl, apiKey, model } = getConfig();
+    if (!baseUrl || !apiKey) {
+      throw new Error("未配置 AI：请先在 demo/ai-config.js 填写 baseUrl 与 apiKey");
+    }
+
+    const stopCount = Math.min(12, Math.max(6, Number(options.stopCount) || 9));
+    const hint = String(options.hint || "").trim();
+    const user = [
+      `请为景点「${place}」生成家庭版内容包 JSON。`,
+      `站点数：约 ${stopCount} 站。`,
+      hint ? `补充要求：${hint}` : "自行选择最适合亲子共读的一条主线（如参观顺序、环线、成形与保护）。",
+      "title 形如「××经纬」；id 用小写拼音或英文。",
+      "stops 数组顺序 = 地图播放顺序。",
+    ].join("\n");
+
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.5,
+        messages: [
+          { role: "system", content: PACK_SYSTEM },
+          { role: "user", content: user },
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`AI 接口错误 ${res.status}: ${text.slice(0, 200)}`);
+    }
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error("AI 返回为空");
+
+    const pack = extractJsonObject(content);
+    if (!Array.isArray(pack.stops) || !pack.stops.length) {
+      throw new Error("生成结果缺少 stops，请重试");
+    }
+    pack.place = pack.place || place;
+    pack.title = pack.title || `${place}经纬`;
+    return pack;
+  }
+
+  window.PlaceTraceAI = { askAboutStop, getConfig, buildContext, generatePack, extractJsonObject };
 })();

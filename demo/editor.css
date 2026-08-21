@@ -1,0 +1,273 @@
+.editor-body {
+  min-height: 100vh;
+}
+
+.editor-topbar {
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.editor-tip {
+  margin: 0 1.25rem 0.75rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: 12px;
+  background: rgba(255, 252, 247, 0.9);
+  border: 1px solid var(--line);
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.editor-tip.ok {
+  border-color: rgba(47, 111, 126, 0.35);
+  color: var(--water-deep);
+}
+
+.editor-tip.err {
+  border-color: rgba(184, 90, 98, 0.35);
+  color: #6b3038;
+}
+
+.editor-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) 1fr;
+  gap: 1rem;
+  padding: 0 1.25rem 1.5rem;
+  align-items: start;
+}
+
+.editor-side {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.editor-card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1rem 1.05rem 1.15rem;
+}
+
+.editor-card h2 {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+}
+
+.editor-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.65rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.editor-card input,
+.editor-card textarea {
+  font: inherit;
+  font-weight: 500;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.5rem 0.65rem;
+  background: #fff;
+}
+
+.editor-card textarea {
+  resize: vertical;
+  line-height: 1.55;
+}
+
+.row2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+}
+
+.side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.side-head h2 {
+  margin: 0;
+}
+
+.btn.sm {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.82rem;
+}
+
+.btn.danger {
+  background: rgba(184, 90, 98, 0.12);
+  border-color: rgba(184, 90, 98, 0.35);
+  color: #6b3038;
+}
+
+.stop-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.stop-list li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.35rem;
+  align-items: center;
+  margin-bottom: 0.4rem;
+}
+
+.stop-list button.pick {
+  text-align: left;
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 12px;
+  padding: 0.55rem 0.65rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.stop-list button.pick.active {
+  border-color: var(--water);
+  background: rgba(47, 111, 126, 0.1);
+}
+
+.stop-list .pick strong {
+  display: block;
+  font-size: 0.9rem;
+}
+
+.stop-list .pick span {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+}
+
+.stop-list .move {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.stop-list .move button {
+  border: 1px solid var(--line);
+  background: #fff;
+  border-radius: 8px;
+  width: 1.8rem;
+  height: 1.5rem;
+  cursor: pointer;
+  font-size: 0.7rem;
+}
+
+.empty-hint {
+  color: var(--ink-soft);
+  margin: 0.5rem 0 0;
+}
+
+.stop-fields.hidden,
+.empty-hint.hidden {
+  display: none;
+}
+
+.danger-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.editor-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(20, 34, 43, 0.45);
+}
+
+.editor-modal.hidden {
+  display: none;
+}
+
+.editor-modal-card {
+  width: min(440px, 100%);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.15rem 1.2rem 1.25rem;
+}
+
+.editor-modal-card h2 {
+  margin: 0 0 0.45rem;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+}
+
+.modal-desc,
+.modal-note {
+  margin: 0 0 0.85rem;
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.editor-modal-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.7rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.editor-modal-card input,
+.editor-modal-card select {
+  font: inherit;
+  font-weight: 500;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.5rem 0.65rem;
+  background: #fff;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 960px) {
+  .editor-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .row2 {
+    grid-template-columns: 1fr;
+  }
+}

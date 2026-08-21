@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>内容包编辑器 · 地方经纬</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./editor.css" />
+</head>
+<body class="editor-body">
+  <div class="atmosphere" aria-hidden="true"></div>
+
+  <header class="topbar editor-topbar">
+    <div class="brand">
+      <span class="brand-mark">编</span>
+      <div>
+        <p class="brand-kicker">地方经纬 · 内容包编辑器</p>
+        <h1>可视化编辑</h1>
+      </div>
+    </div>
+    <div class="editor-actions">
+      <label class="pack-switch">
+        <span>载入</span>
+        <select id="loadSelect" aria-label="载入已有内容包"></select>
+      </label>
+      <button type="button" class="btn primary" id="btnAiNew">AI 生成</button>
+      <button type="button" class="btn" id="btnNew">新建空白包</button>
+      <button type="button" class="btn" id="btnImport">导入 JSON</button>
+      <input type="file" id="fileInput" accept="application/json,.json" hidden />
+      <button type="button" class="btn" id="btnSaveDraft">存草稿</button>
+      <button type="button" class="btn primary" id="btnExport">下载 JSON</button>
+      <button type="button" class="btn primary" id="btnPreview">预览播放</button>
+      <a class="btn" href="./">回播放页</a>
+    </div>
+  </header>
+
+  <p class="editor-tip" id="statusTip">可用「AI 生成」输入景点自动起草，再手工改文案与坐标；正式上线请下载 JSON，放到 data/ 并在 packs.js 登记。</p>
+
+  <div class="editor-modal hidden" id="aiModal" role="dialog" aria-modal="true" aria-labelledby="aiModalTitle">
+    <div class="editor-modal-card">
+      <h2 id="aiModalTitle">AI 生成内容包</h2>
+      <p class="modal-desc">填写景点后，大模型会起草 8–10 站家庭版内容；生成后可在本页继续改。</p>
+      <label>景点名称 <input id="aiPlace" placeholder="例如：黄山 / 拙政园 / 鼓浪屿" /></label>
+      <label>主线或补充（可选） <input id="aiHint" placeholder="例如：按核心景区参观顺序，侧重园林与文人" /></label>
+      <label>站点数
+        <select id="aiStopCount">
+          <option value="8">约 8 站</option>
+          <option value="9" selected>约 9 站</option>
+          <option value="10">约 10 站</option>
+          <option value="12">约 12 站</option>
+        </select>
+      </label>
+      <p class="modal-note" id="aiModalNote">需要已配置 demo/ai-config.js 的 API Key。</p>
+      <div class="modal-actions">
+        <button type="button" class="btn" id="btnAiCancel">取消</button>
+        <button type="button" class="btn primary" id="btnAiRun">开始生成</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="editor-layout">
+    <aside class="editor-side">
+      <section class="editor-card">
+        <h2>内容包信息</h2>
+        <label>ID <input id="packId" placeholder="huangshan" /></label>
+        <label>标题 <input id="packTitle" placeholder="黄山经纬" /></label>
+        <label>副标题 <input id="packSubtitle" /></label>
+        <label>一句话 <input id="packTagline" /></label>
+        <label>地点名 <input id="packPlace" /></label>
+        <div class="row2">
+          <label>中心纬度 <input id="mapLat" type="number" step="any" /></label>
+          <label>中心经度 <input id="mapLng" type="number" step="any" /></label>
+        </div>
+        <label>缩放 <input id="mapZoom" type="number" min="10" max="18" step="1" /></label>
+      </section>
+
+      <section class="editor-card">
+        <div class="side-head">
+          <h2>站点列表</h2>
+          <button type="button" class="btn primary sm" id="btnAddStop">+ 加站</button>
+        </div>
+        <ul class="stop-list" id="stopList"></ul>
+      </section>
+    </aside>
+
+    <section class="editor-main editor-card" id="stopEditor">
+      <h2>当前站点</h2>
+      <p class="empty-hint" id="emptyHint">左侧选择或新增一站开始编辑。</p>
+      <div id="stopFields" class="stop-fields hidden">
+        <div class="row2">
+          <label>站 ID <input id="stopId" /></label>
+          <label>印章（2–3字） <input id="stopStamp" maxlength="4" /></label>
+        </div>
+        <div class="row2">
+          <label>年份 <input id="stopYear" /></label>
+          <label>年份标签 <input id="stopYearLabel" /></label>
+        </div>
+        <label>标题 <input id="stopTitle" /></label>
+        <div class="row2">
+          <label>古/景名 <input id="stopPlaceName" /></label>
+          <label>现代地名 <input id="stopModernPlace" /></label>
+        </div>
+        <div class="row2">
+          <label>纬度 lat <input id="stopLat" type="number" step="any" /></label>
+          <label>经度 lng <input id="stopLng" type="number" step="any" /></label>
+        </div>
+        <div class="row2">
+          <label>阶段 <input id="stopStage" /></label>
+          <label>相关人物 <input id="stopPerson" placeholder="可空" /></label>
+        </div>
+        <div class="row2">
+          <label>可信度 <input id="stopConfidence" /></label>
+          <label>可信度说明 <input id="stopConfidenceNote" /></label>
+        </div>
+        <label>孩子文案 <textarea id="stopKid" rows="4"></textarea></label>
+        <label>家长旁注 <textarea id="stopParent" rows="3"></textarea></label>
+        <label>题目 <input id="quizQ" /></label>
+        <label>选项（每行一个，建议 3 个） <textarea id="quizOptions" rows="3"></textarea></label>
+        <div class="row2">
+          <label>正确答案（从 0 起；开放题留空） <input id="quizAnswer" placeholder="0 / 1 / 2 或空" /></label>
+          <label>提示 <input id="quizHint" /></label>
+        </div>
+        <label>来源（每行一条） <textarea id="stopSources" rows="2"></textarea></label>
+        <div class="danger-row">
+          <button type="button" class="btn" id="btnDupStop">复制本站</button>
+          <button type="button" class="btn danger" id="btnDelStop">删除本站</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="./ai-config.js"></script>
+  <script src="./ai.js"></script>
+  <script src="./packs.js"></script>
+  <script src="./editor.js"></script>
+</body>
+</html>

@@ -26,6 +26,7 @@
         <span>景点</span>
         <select id="packSelect" aria-label="切换景点内容包"></select>
       </label>
+      <a class="btn" href="./editor.html">编辑内容包</a>
       <div class="top-stats" id="topStats"></div>
     </div>
   </header>
@@ -35,6 +36,7 @@
       <div id="map" role="application" aria-label="西湖历史地图"></div>
       <div class="map-controls">
         <button type="button" class="btn primary" id="btnPlay">▶ 播放湖史</button>
+        <button type="button" class="btn" id="btnVoice" aria-pressed="false" title="语音播报开关">静音</button>
         <button type="button" class="btn" id="btnReset">↺ 重置</button>
         <div class="speed" role="group" aria-label="播放速度">
           <button type="button" class="chip" data-speed="0.7">0.7×</button>
@@ -77,7 +79,6 @@
         </div>
 
         <p class="sources" id="stopSources"></p>
-        <a class="amap-link" id="amapLink" href="#" target="_blank" rel="noopener">在高德地图查看现代位置 ↗</a>
 
         <section class="ask-box" aria-label="问一问">
           <div class="ask-head">

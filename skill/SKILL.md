@@ -23,6 +23,7 @@ description: >-
 1. `data/<place-id>.json` — 景点内容包（主交付）
 2. `demo/` — 可打开的播放页（可复用本仓库 demo，只换 JSON）
 3. 在 `demo/packs.js` 注册新包，页面顶部即可切换
+4. 也可用 `demo/editor.html` 可视化编辑内容包（存草稿、预览播放、下载 JSON）
 4. 可选：实地小路线建议（3–5 点）
 
 ## AI 两层能力

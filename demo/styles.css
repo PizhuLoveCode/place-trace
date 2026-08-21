@@ -170,6 +170,11 @@ body {
   box-shadow: 0 10px 24px rgba(47, 111, 126, 0.28);
 }
 
+.btn.voice-off {
+  background: rgba(20, 34, 43, 0.06);
+  color: var(--ink-soft);
+}
+
 .btn.lg {
   padding: 0.85rem 1.4rem;
   font-size: 1.05rem;
@@ -555,19 +560,6 @@ body {
   padding: 0.1em 0.35em;
   border-radius: 6px;
   background: rgba(20, 34, 43, 0.06);
-}
-
-.amap-link {
-  display: inline-block;
-  margin-top: 0.85rem;
-  color: var(--water);
-  font-weight: 600;
-  font-size: 0.9rem;
-  text-decoration: none;
-}
-
-.amap-link:hover {
-  text-decoration: underline;
 }
 
 #map {

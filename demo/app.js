@@ -22,12 +22,12 @@
     stopKid: $("stopKid"),
     stopParent: $("stopParent"),
     stopSources: $("stopSources"),
-    amapLink: $("amapLink"),
     quizQ: $("quizQ"),
     quizOptions: $("quizOptions"),
     quizFeedback: $("quizFeedback"),
     storyCard: $("storyCard"),
     btnPlay: $("btnPlay"),
+    btnVoice: $("btnVoice"),
     btnReset: $("btnReset"),
     btnPrev: $("btnPrev"),
     btnNext: $("btnNext"),
@@ -59,6 +59,11 @@
     visited: new Set(),
     answered: new Set(),
     timer: null,
+    speakPromise: null,
+    speakTimer: null,
+    speakKeepAlive: null,
+    utterance: null,
+    muted: localStorage.getItem("place-trace:voice-muted") === "1",
     map: null,
     markers: [],
     line: null,
@@ -114,27 +119,55 @@
     });
   }
 
+  const PREVIEW_KEY = "place-trace:preview-pack";
+  const DRAFT_META = { id: "draft", label: "编辑预览", url: null, mark: "编" };
+
+  function readPreviewPack() {
+    try {
+      const raw = localStorage.getItem(PREVIEW_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function allPackOptions() {
+    const list = [...PACKS];
+    if (readPreviewPack()) list.push(DRAFT_META);
+    return list;
+  }
+
   function currentPackId() {
     const q = new URLSearchParams(location.search).get("pack");
+    if (q === "draft" && readPreviewPack()) return "draft";
     if (q && PACKS.some((p) => p.id === q)) return q;
     return PACKS[0].id;
   }
 
   function fillPackSelect() {
     const id = currentPackId();
-    ui.packSelect.innerHTML = PACKS.map(
-      (p) => `<option value="${p.id}" ${p.id === id ? "selected" : ""}>${escapeHtml(p.label)}</option>`
-    ).join("");
+    ui.packSelect.innerHTML = allPackOptions()
+      .map((p) => `<option value="${p.id}" ${p.id === id ? "selected" : ""}>${escapeHtml(p.label)}</option>`)
+      .join("");
   }
 
   async function loadPackById(id) {
-    const meta = PACKS.find((p) => p.id === id) || PACKS[0];
-    state.packMeta = meta;
-    const pack = await fetch(meta.url).then((r) => {
-      if (!r.ok) throw new Error(`无法加载 ${meta.url}`);
-      return r.json();
-    });
+    let meta;
+    let pack;
 
+    if (id === "draft") {
+      pack = readPreviewPack();
+      if (!pack) throw new Error("没有可预览的编辑草稿，请先在编辑器点「预览播放」");
+      meta = { ...DRAFT_META, mark: (pack.title || "编").slice(0, 1) };
+    } else {
+      meta = PACKS.find((p) => p.id === id) || PACKS[0];
+      pack = await fetch(meta.url).then((r) => {
+        if (!r.ok) throw new Error(`无法加载 ${meta.url}`);
+        return r.json();
+      });
+    }
+
+    state.packMeta = meta;
     state.pack = pack;
     state.index = 0;
     state.visited = new Set();
@@ -153,6 +186,7 @@
     const url = new URL(location.href);
     url.searchParams.set("pack", meta.id);
     history.replaceState(null, "", url);
+    fillPackSelect();
     ui.packSelect.value = meta.id;
   }
 
@@ -233,7 +267,7 @@
       });
       marker.on("click", () => {
         stopPlayback();
-        renderStop(i, { fly: true });
+        renderStop(i, { fly: true, fromGesture: true });
       });
       state.map.add(marker);
       return marker;
@@ -262,9 +296,219 @@
       .join("");
   }
 
+  function cancelSpeak() {
+    if (state.speakTimer) {
+      clearTimeout(state.speakTimer);
+      state.speakTimer = null;
+    }
+    if (state.speakKeepAlive) {
+      clearInterval(state.speakKeepAlive);
+      state.speakKeepAlive = null;
+    }
+    state.utterance = null;
+    if (window.speechSynthesis) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch (_) {}
+    }
+    state.speakPromise = Promise.resolve();
+  }
+
+  function isChromeLike() {
+    const ua = navigator.userAgent;
+    return /Chrome|CriOS/.test(ua) && !/Edg|OPR/.test(ua);
+  }
+
+  function warmVoices() {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.getVoices();
+    window.speechSynthesis.onvoiceschanged = () => {
+      window.speechSynthesis.getVoices();
+    };
+  }
+
+  function pickZhVoice() {
+    if (!window.speechSynthesis) return null;
+    const voices = window.speechSynthesis.getVoices() || [];
+    if (!voices.length) return null;
+
+    const zh = voices.filter(
+      (v) => /^zh(-|$)/i.test(v.lang) || /Chinese|中文|普通话|国语/i.test(v.name)
+    );
+    // Chrome 远程 Google 语音常无声，优先本地中文语音
+    const localZh = zh.filter((v) => v.localService);
+    return (
+      localZh.find((v) => /zh-CN/i.test(v.lang)) ||
+      localZh[0] ||
+      zh.find((v) => /zh-CN/i.test(v.lang) && !/Google/i.test(v.name)) ||
+      zh.find((v) => /zh-CN/i.test(v.lang)) ||
+      zh[0] ||
+      null
+    );
+  }
+
+  function syncVoiceButton() {
+    if (!ui.btnVoice) return;
+    const supported = typeof window.speechSynthesis !== "undefined";
+    if (!supported) {
+      ui.btnVoice.disabled = true;
+      ui.btnVoice.textContent = "无语音";
+      ui.btnVoice.title = "当前浏览器不支持语音播报";
+      return;
+    }
+    ui.btnVoice.disabled = false;
+    ui.btnVoice.setAttribute("aria-pressed", state.muted ? "true" : "false");
+    if (state.muted) {
+      ui.btnVoice.textContent = "开启语音";
+      ui.btnVoice.title = "点击开启孩子文案播报";
+      ui.btnVoice.classList.add("voice-off");
+    } else {
+      ui.btnVoice.textContent = "静音";
+      ui.btnVoice.title = "点击关闭语音播报";
+      ui.btnVoice.classList.remove("voice-off");
+    }
+  }
+
+  function setMuted(muted) {
+    state.muted = Boolean(muted);
+    localStorage.setItem("place-trace:voice-muted", state.muted ? "1" : "0");
+    syncVoiceButton();
+    if (state.muted) cancelSpeak();
+    else if (state.pack) speakCurrentStop({ fromGesture: true });
+  }
+
+  function speakCurrentStop(opts) {
+    const fromGesture = Boolean(opts && opts.fromGesture);
+
+    if (state.muted || !state.pack || typeof window.speechSynthesis === "undefined") {
+      cancelSpeak();
+      state.speakPromise = Promise.resolve();
+      return state.speakPromise;
+    }
+    const stop = state.pack.stops[state.index];
+    if (!stop) {
+      state.speakPromise = Promise.resolve();
+      return state.speakPromise;
+    }
+    const text = [stop.title, stop.kid].filter(Boolean).join("。");
+    if (!text.trim()) {
+      state.speakPromise = Promise.resolve();
+      return state.speakPromise;
+    }
+
+    // 分句：减轻 Chrome 长文本/15 秒卡死问题
+    const parts = [];
+    String(text).replace(/[^。！？；\n]+[。！？；\n]?/g, (m) => {
+      const t = m.trim();
+      if (t) parts.push(t);
+    });
+    if (!parts.length) parts.push(text.trim());
+
+    if (state.speakTimer) {
+      clearTimeout(state.speakTimer);
+      state.speakTimer = null;
+    }
+    if (state.speakKeepAlive) {
+      clearInterval(state.speakKeepAlive);
+      state.speakKeepAlive = null;
+    }
+
+    const synth = window.speechSynthesis;
+    const busy = synth.speaking || synth.pending;
+    // Chrome：用户点击手势里必须尽快 speak；若当前正播，才 cancel 后短延迟
+    // 非手势路径（自动切站）可稍等，避免 cancel 竞态
+    let delay = 0;
+    if (busy) {
+      try {
+        synth.cancel();
+      } catch (_) {}
+      delay = fromGesture ? 50 : isChromeLike() ? 200 : 60;
+    } else if (!fromGesture && isChromeLike()) {
+      delay = 80;
+    }
+
+    state.speakPromise = new Promise((resolve) => {
+      let idx = 0;
+      let settled = false;
+
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        if (state.speakKeepAlive) {
+          clearInterval(state.speakKeepAlive);
+          state.speakKeepAlive = null;
+        }
+        state.utterance = null;
+        try {
+          delete window.__placeTraceUtterance;
+        } catch (_) {}
+        resolve();
+      };
+
+      const speakNext = () => {
+        if (state.muted || settled) {
+          finish();
+          return;
+        }
+        if (idx >= parts.length) {
+          finish();
+          return;
+        }
+
+        const u = new SpeechSynthesisUtterance(parts[idx++]);
+        // 关键：Chrome 会回收未挂到全局的 Utterance，导致无声
+        state.utterance = u;
+        window.__placeTraceUtterance = u;
+        u.lang = "zh-CN";
+        const voice = pickZhVoice();
+        // Chrome 上 Google 在线中文语音经常失败，只绑定本地语音
+        if (voice && (voice.localService || !isChromeLike())) {
+          u.voice = voice;
+        }
+        u.rate = Math.min(1.15, Math.max(0.85, 0.95 * state.speed));
+        u.pitch = 1;
+        u.volume = 1;
+
+        u.onend = () => speakNext();
+        u.onerror = () => speakNext();
+
+        try {
+          synth.speak(u);
+          synth.resume();
+        } catch (_) {
+          finish();
+        }
+      };
+
+      state.speakKeepAlive = setInterval(() => {
+        if (!window.speechSynthesis) return;
+        if (state.muted || settled) return;
+        if (synth.speaking && synth.paused) synth.resume();
+        if (isChromeLike() && synth.speaking) {
+          synth.pause();
+          synth.resume();
+        }
+      }, 9000);
+
+      const start = () => {
+        state.speakTimer = null;
+        speakNext();
+      };
+
+      if (delay > 0) {
+        state.speakTimer = setTimeout(start, delay);
+      } else {
+        start();
+      }
+    });
+
+    return state.speakPromise;
+  }
+
   function bindUi() {
     if (state.uiBound) return;
     state.uiBound = true;
+    syncVoiceButton();
 
     ui.packSelect.addEventListener("change", async () => {
       try {
@@ -278,7 +522,9 @@
 
     ui.btnStart.addEventListener("click", () => {
       ui.startOverlay.classList.add("hidden");
-      if (state.mode === "listen" && state.map) startPlayback();
+      // 必须在用户点击手势里触发 speak，否则 Chrome 会静默拦截
+      if (state.mode === "listen" && state.map) startPlayback({ fromGesture: true });
+      else speakCurrentStop({ fromGesture: true });
     });
 
     ui.btnPlay.addEventListener("click", () => {
@@ -287,14 +533,20 @@
         return;
       }
       if (state.playing) stopPlayback();
-      else startPlayback();
+      else startPlayback({ fromGesture: true });
     });
+
+    if (ui.btnVoice) {
+      ui.btnVoice.addEventListener("click", () => {
+        setMuted(!state.muted);
+      });
+    }
 
     ui.btnReset.addEventListener("click", () => {
       stopPlayback();
       state.visited.clear();
       state.answered.clear();
-      renderStop(0, { fly: true });
+      renderStop(0, { fly: true, fromGesture: true });
       ui.endOverlay.classList.add("hidden");
       if (state.map && state.markers.length) {
         state.map.setFitView(state.markers, false, [48, 48, 48, 48]);
@@ -303,24 +555,25 @@
 
     ui.btnPrev.addEventListener("click", () => {
       stopPlayback();
-      renderStop(Math.max(0, state.index - 1), { fly: true });
+      renderStop(Math.max(0, state.index - 1), { fly: true, fromGesture: true });
     });
 
     ui.btnNext.addEventListener("click", () => {
       stopPlayback();
-      goNext();
+      goNext({ fromGesture: true });
     });
 
     ui.btnReplay.addEventListener("click", () => {
       ui.endOverlay.classList.add("hidden");
       state.visited.clear();
       state.answered.clear();
-      renderStop(0, { fly: true });
-      if (state.map) startPlayback();
+      renderStop(0, { fly: true, fromGesture: true });
+      if (state.map) startPlayback({ fromGesture: true });
     });
 
     ui.btnCloseEnd.addEventListener("click", () => {
       ui.endOverlay.classList.add("hidden");
+      cancelSpeak();
     });
 
     document.querySelectorAll(".chip").forEach((chip) => {
@@ -330,7 +583,9 @@
         state.speed = Number(chip.dataset.speed);
         if (state.playing) {
           stopPlayback();
-          startPlayback();
+          startPlayback({ fromGesture: true });
+        } else if (!state.muted) {
+          speakCurrentStop({ fromGesture: true });
         }
       });
     });
@@ -348,7 +603,7 @@
       const tick = e.target.closest(".tick");
       if (!tick) return;
       stopPlayback();
-      renderStop(Number(tick.dataset.i), { fly: true });
+      renderStop(Number(tick.dataset.i), { fly: true, fromGesture: true });
     });
 
     ui.btnAsk.addEventListener("click", () => runAsk());
@@ -419,9 +674,10 @@
     }
   }
 
-  function startPlayback() {
+  function startPlayback(opts) {
     state.playing = true;
     ui.btnPlay.textContent = "❚❚ 暂停";
+    if (!state.muted) speakCurrentStop({ fromGesture: Boolean(opts && opts.fromGesture) });
     scheduleAdvance();
   }
 
@@ -432,12 +688,13 @@
       clearTimeout(state.timer);
       state.timer = null;
     }
+    cancelSpeak();
   }
 
   function scheduleAdvance() {
     if (!state.playing) return;
-    const dwell = (state.mode === "listen" ? 5200 : 3800) / state.speed;
-    state.timer = setTimeout(() => {
+    const advance = () => {
+      if (!state.playing) return;
       if (state.index >= state.pack.stops.length - 1) {
         stopPlayback();
         showEnd();
@@ -445,15 +702,31 @@
       }
       renderStop(state.index + 1, { fly: true });
       scheduleAdvance();
-    }, dwell);
+    };
+
+    if (state.muted) {
+      const dwell = (state.mode === "listen" ? 5200 : 3800) / state.speed;
+      state.timer = setTimeout(advance, dwell);
+      return;
+    }
+
+    Promise.resolve(state.speakPromise)
+      .catch(() => {})
+      .then(() => {
+        if (!state.playing) return;
+        state.timer = setTimeout(advance, 700);
+      });
   }
 
-  function goNext() {
+  function goNext(opts) {
     if (state.index >= state.pack.stops.length - 1) {
       showEnd();
       return;
     }
-    renderStop(state.index + 1, { fly: true });
+    renderStop(state.index + 1, {
+      fly: true,
+      fromGesture: Boolean(opts && opts.fromGesture),
+    });
   }
 
   function renderStop(i, flyOpt) {
@@ -471,18 +744,6 @@
     ui.stopKid.textContent = stop.kid;
     ui.stopParent.textContent = stop.parent;
     ui.stopSources.textContent = `来源：${stop.sources.join(" · ")}`;
-
-    const lnglat = toAmap(stop.coords);
-    const lng = lnglat[0];
-    const lat = lnglat[1];
-    ui.amapLink.href =
-      "https://uri.amap.com/marker?position=" +
-      lng +
-      "," +
-      lat +
-      "&name=" +
-      encodeURIComponent(stop.modernPlace || stop.placeName) +
-      "&coordinate=gaode&callnative=0";
 
     if (stop.person) {
       ui.stopPerson.hidden = false;
@@ -506,6 +767,13 @@
       const zoom = Math.max(state.map.getZoom(), pack.map.zoom || 14);
       if (fly) state.map.setZoomAndCenter(zoom, pos, false, 700);
       else state.map.setZoomAndCenter(pack.map.zoom, pos);
+    }
+
+    // 开始页未关闭时不播报，避免自动播放被浏览器拦截或抢戏
+    if (ui.startOverlay && !ui.startOverlay.classList.contains("hidden")) {
+      cancelSpeak();
+    } else {
+      speakCurrentStop({ fromGesture: Boolean(flyOpt && flyOpt.fromGesture) });
     }
   }
 
@@ -597,6 +865,7 @@
   }
 
   async function boot() {
+    warmVoices();
     fillPackSelect();
     bindUi();
 
@@ -610,7 +879,20 @@
       showBanner(String(err.message || err), true);
     }
 
-    await loadPackById(currentPackId());
+    try {
+      await loadPackById(currentPackId());
+    } catch (err) {
+      if (currentPackId() === "draft") {
+        await loadPackById(PACKS[0].id);
+        tipBannerFallback(err);
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  function tipBannerFallback(err) {
+    showBanner(`${err.message || err}；已切回默认内容包。`, true);
   }
 
   boot().catch((err) => {
